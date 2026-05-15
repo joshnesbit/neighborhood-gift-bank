@@ -18,7 +18,7 @@ export function PersonRow({ person }: { person: Person }) {
           </p>
         )}
       </div>
-      <span className="text-xs text-ink-faint font-hand ml-3 shrink-0">
+      <span className="text-sm text-ink-faint font-hand ml-3 shrink-0">
         {person.last_seen_at ? timeAgo(person.last_seen_at) : "new"}
       </span>
     </Link>

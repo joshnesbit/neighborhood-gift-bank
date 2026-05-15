@@ -1,16 +1,42 @@
 import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { demo } from "@/lib/demo-data";
 
 export async function GET(request: NextRequest) {
-  const q = request.nextUrl.searchParams.get("q")?.trim();
+  const q = request.nextUrl.searchParams.get("q")?.trim()?.toLowerCase();
 
   if (!q) {
-    return Response.json({ people: [], notes: [] });
+    return Response.json({ people: [], gifts: [], notes: [] });
   }
 
   const supabase = createServerClient();
-  if (!supabase) return Response.json({ people: [], gifts: [], notes: [] });
-  const tsQuery = q.split(/\s+/).join(" & ");
+
+  if (!supabase) {
+    const people = demo.people.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.where_they_are && p.where_they_are.toLowerCase().includes(q)) ||
+        p.aliases.some((a) => a.toLowerCase().includes(q))
+    );
+
+    const matchingGifts = demo.gifts.filter((g) => g.text.toLowerCase().includes(q));
+
+    const existingIds = new Set(people.map((p) => p.id));
+    const giftPeople = demo.people.filter(
+      (p) => !existingIds.has(p.id) && matchingGifts.some((g) => g.person_id === p.id)
+    );
+
+    const notes = demo.notes
+      .filter((n) => n.raw_text.toLowerCase().includes(q))
+      .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())
+      .map((n) => ({ id: n.id, raw_text: n.raw_text, recorded_at: n.recorded_at }));
+
+    return Response.json({
+      people: [...people, ...giftPeople],
+      gifts: matchingGifts,
+      notes,
+    });
+  }
 
   // Search people
   const { data: people } = await supabase

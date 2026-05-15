@@ -1,11 +1,26 @@
 import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { demo } from "@/lib/demo-data";
 
 export async function GET(request: NextRequest) {
   const supabase = createServerClient();
-  if (!supabase) return Response.json([]);
-
   const sort = request.nextUrl.searchParams.get("sort") || "recent";
+
+  if (!supabase) {
+    const sorted = [...demo.people];
+    switch (sort) {
+      case "recent":
+        sorted.sort((a, b) => new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime());
+        break;
+      case "unseen":
+        sorted.sort((a, b) => new Date(a.last_seen_at || 0).getTime() - new Date(b.last_seen_at || 0).getTime());
+        break;
+      case "alpha":
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+    }
+    return Response.json(sorted);
+  }
 
   let query = supabase.from("people").select("*");
 

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, Fraunces, Caveat } from "next/font/google";
+import { DM_Sans, Fraunces } from "next/font/google";
 import { AuthProvider } from "@/components/auth-provider";
 import "./globals.css";
 
@@ -15,11 +15,6 @@ const fraunces = Fraunces({
   weight: ["400", "500", "600", "700"],
 });
 
-const caveat = Caveat({
-  variable: "--font-caveat",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
 
 export const metadata: Metadata = {
   title: "Rover Notes",
@@ -48,7 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmSans.variable} ${fraunces.variable} ${caveat.variable} h-full`}
+      className={`${dmSans.variable} ${fraunces.variable} h-full`}
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>{children}</AuthProvider>

@@ -102,7 +102,7 @@ export default function NewNotePage() {
               <p className="font-serif text-xl mb-1">
                 {person.name}
                 {!person.matched_id && (
-                  <span className="font-hand text-sm text-sage ml-2">new neighbor</span>
+                  <span className="font-hand text-base text-sage ml-2">new neighbor</span>
                 )}
               </p>
               {person.where_they_are && (
@@ -120,7 +120,7 @@ export default function NewNotePage() {
 
           {parsed.follow_ups && parsed.follow_ups.length > 0 && (
             <div className="bg-cream rounded-2xl p-5 shadow-[0_2px_8px_var(--color-warm-shadow)]">
-              <p className="font-hand text-sm text-ink-faint mb-2">follow-ups</p>
+              <p className="font-hand text-base text-ink-faint mb-2">follow-ups</p>
               <ul className="space-y-1">
                 {parsed.follow_ups.map((f, i) => (
                   <li key={i} className="text-sm text-ink">• {f}</li>
@@ -178,7 +178,7 @@ export default function NewNotePage() {
       <div className="flex-1 px-5 py-3 flex flex-col">
         <div className="flex items-center gap-2 mb-3 text-ink-faint">
           <Mic className="w-4 h-4" strokeWidth={2.5} />
-          <span className="font-hand text-sm">tap the mic on your keyboard to talk</span>
+          <span className="font-hand text-base">tap the mic on your keyboard to talk</span>
         </div>
 
         <textarea

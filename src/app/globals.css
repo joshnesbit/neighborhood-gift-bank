@@ -5,7 +5,7 @@
   --color-paper-dark: #EDE4D3;
   --color-ink: #3B2A1E;
   --color-ink-light: #6B5744;
-  --color-ink-faint: #9B8B7A;
+  --color-ink-faint: #7A6B5A;
   --color-terracotta: #C4694A;
   --color-terracotta-light: #E8A98E;
   --color-sage: #7A9B6D;
@@ -16,7 +16,7 @@
 
   --font-sans: var(--font-dm-sans);
   --font-serif: var(--font-fraunces);
-  --font-hand: var(--font-caveat);
+  --font-hand: var(--font-dm-sans);
 }
 
 * {

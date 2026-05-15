@@ -33,7 +33,7 @@ export function GiftChip({
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border ${kindStyles[kind]} transition-colors duration-300 ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
     >
-      <span className="font-hand text-xs opacity-60">{kindLabels[kind]}</span>
+      <span className="font-hand text-sm opacity-60">{kindLabels[kind]}</span>
       <span>{text}</span>
     </Component>
   );

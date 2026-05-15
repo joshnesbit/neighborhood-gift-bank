@@ -98,7 +98,7 @@ export default function SearchPage() {
 
         {results && results.people.length > 0 && (
           <div className="mt-4">
-            <h3 className="font-hand text-sm text-ink-faint mb-1">people</h3>
+            <h3 className="font-hand text-base text-ink-faint mb-1">people</h3>
             <div className="divide-y divide-ink/5">
               {results.people.map((person) => (
                 <PersonRow key={person.id} person={person} />
@@ -109,14 +109,14 @@ export default function SearchPage() {
 
         {results && results.notes.length > 0 && (
           <div className="mt-6">
-            <h3 className="font-hand text-sm text-ink-faint mb-2">notes</h3>
+            <h3 className="font-hand text-base text-ink-faint mb-2">notes</h3>
             <div className="space-y-3">
               {results.notes.map((note) => (
                 <div
                   key={note.id}
                   className="bg-cream rounded-2xl p-4 border border-ink/5"
                 >
-                  <p className="font-hand text-xs text-ink-faint mb-1">
+                  <p className="font-hand text-sm text-ink-faint mb-1">
                     {formatDate(note.recorded_at)}
                   </p>
                   <p className="text-sm text-ink leading-relaxed line-clamp-3">

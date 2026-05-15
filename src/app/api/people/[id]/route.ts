@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { demo } from "@/lib/demo-data";
 
 export async function GET(
   request: NextRequest,
@@ -7,7 +8,33 @@ export async function GET(
 ) {
   const { id } = await params;
   const supabase = createServerClient();
-  if (!supabase) return Response.json({ error: "Not configured" }, { status: 503 });
+
+  if (!supabase) {
+    const person = demo.people.find((p) => p.id === id);
+    if (!person) return Response.json({ error: "Person not found" }, { status: 404 });
+
+    const gifts = demo.gifts.filter((g) => g.person_id === id);
+    const connectionsFrom = demo.connections.filter((c) => c.from_person === id);
+    const connectionsTo = demo.connections.filter((c) => c.to_person === id);
+
+    const nameMap = new Map(demo.people.map((p) => [p.id, p.name]));
+
+    const noteIds = demo.notePeople
+      .filter((np) => np.person_id === id)
+      .map((np) => np.note_id);
+    const notes = demo.notes
+      .filter((n) => noteIds.includes(n.id))
+      .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())
+      .map((n) => ({ id: n.id, raw_text: n.raw_text, recorded_at: n.recorded_at, created_at: n.created_at }));
+
+    return Response.json({
+      ...person,
+      gifts,
+      connections_from: connectionsFrom.map((c) => ({ ...c, to_person_name: nameMap.get(c.to_person) })),
+      connections_to: connectionsTo.map((c) => ({ ...c, from_person_name: nameMap.get(c.from_person) })),
+      notes,
+    });
+  }
 
   // Get person
   const { data: person, error } = await supabase

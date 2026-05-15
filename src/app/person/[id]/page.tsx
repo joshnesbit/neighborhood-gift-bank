@@ -148,7 +148,7 @@ export default function PersonPage({
         {loadingReminders && (
           <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-cream border border-ink/5">
             <Loader2 className="w-4 h-4 animate-spin text-terracotta" strokeWidth={2} />
-            <span className="font-hand text-sm text-ink-faint">thinking...</span>
+            <span className="font-hand text-base text-ink-faint">thinking...</span>
           </div>
         )}
         {reminders && (
@@ -156,7 +156,7 @@ export default function PersonPage({
             className="bg-cream rounded-2xl p-5 border border-ink/5 shadow-[0_2px_8px_var(--color-warm-shadow)]"
             style={{ transform: "rotate(-0.5deg)" }}
           >
-            <p className="font-hand text-xs text-ink-faint mb-2">before you talk to {person.name}...</p>
+            <p className="font-hand text-sm text-ink-faint mb-2">before you talk to {person.name}...</p>
             <div className="text-sm text-ink leading-relaxed whitespace-pre-line">
               {reminders}
             </div>
@@ -176,7 +176,7 @@ export default function PersonPage({
           {Object.entries(giftsByKind).map(([kind, gifts]) => (
             <div key={kind} className="mb-4">
               <div className="flex items-baseline gap-2 mb-2">
-                <h3 className="font-hand text-sm text-ink-faint">
+                <h3 className="font-hand text-base text-ink-faint">
                   {GIFT_LABELS[kind]}
                 </h3>
                 <span className="text-xs text-ink-faint/50">
@@ -200,7 +200,7 @@ export default function PersonPage({
       {/* Connections */}
       {allConnections.length > 0 && (
         <div className="px-5 mt-6">
-          <h3 className="font-hand text-sm text-ink-faint mb-2">connections</h3>
+          <h3 className="font-hand text-base text-ink-faint mb-2">connections</h3>
           <div className="space-y-2">
             {allConnections.map((conn, i) => (
               <div
@@ -223,14 +223,14 @@ export default function PersonPage({
       {/* Notes */}
       {person.notes.length > 0 && (
         <div className="px-5 mt-6">
-          <h3 className="font-hand text-sm text-ink-faint mb-2">notes</h3>
+          <h3 className="font-hand text-base text-ink-faint mb-2">notes</h3>
           <div className="space-y-3">
             {person.notes.map((note) => (
               <div
                 key={note.id}
                 className="bg-cream rounded-2xl p-4 border border-ink/5"
               >
-                <p className="font-hand text-xs text-ink-faint mb-2">
+                <p className="font-hand text-sm text-ink-faint mb-2">
                   {formatDate(note.recorded_at)}
                 </p>
                 <p className="text-sm text-ink leading-relaxed">

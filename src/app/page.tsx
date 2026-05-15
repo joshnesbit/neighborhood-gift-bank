@@ -122,7 +122,7 @@ export default function Home() {
               <button
                 key={mode}
                 onClick={() => setSort(mode)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-hand transition-colors duration-200 ${
+                className={`px-3 py-1.5 rounded-lg text-sm font-hand transition-colors duration-200 ${
                   sort === mode
                     ? "bg-ink text-paper"
                     : "text-ink-faint hover:text-ink"
