@@ -22,7 +22,7 @@ export default function Home() {
   const { user, loading: authLoading, configured, signOut } = useAuth();
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sort, setSort] = useState<SortMode | null>(null);
+  const [sort, setSort] = useState<SortMode>("recent");
   const [quickSearch, setQuickSearch] = useState("");
   const [browsing, setBrowsing] = useState(false);
 
@@ -39,18 +39,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (sort) {
-      setLoading(true);
-      fetchPeople(sort);
-    }
+    setLoading(true);
+    fetchPeople(sort);
   }, [sort, fetchPeople]);
-
-  useEffect(() => {
-    if (quickSearch.trim() && !sort) {
-      setLoading(true);
-      fetchPeople("recent");
-    }
-  }, [quickSearch, sort, fetchPeople]);
 
   const showList = browsing || !!quickSearch.trim();
 
@@ -71,7 +62,6 @@ export default function Home() {
 
   const handleCloseBrowse = () => {
     setBrowsing(false);
-    setSort(null);
     setQuickSearch("");
   };
 
@@ -114,7 +104,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex flex-col h-dvh">
       {/* Header */}
       <header className="px-5 pt-6 pb-1">
         <div className="flex items-center justify-between">
@@ -135,8 +125,14 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Primary actions — centered, easy thumb reach */}
-      <div className="flex-1 flex flex-col justify-center px-5 -mt-8">
+      {/* Primary actions — positioned in the thumb zone */}
+      <div className="flex-1 flex flex-col justify-end px-5 pb-16">
+        <p className="text-center text-ink-faint text-sm mb-8">
+          {people.length > 0
+            ? `${people.length} ${people.length === 1 ? "neighbor" : "neighbors"} in your notebook`
+            : "Go take a walk."}
+        </p>
+
         <div className="space-y-4">
           <button
             onClick={() => router.push("/note/new")}
@@ -154,12 +150,6 @@ export default function Home() {
             Find a Neighbor
           </button>
         </div>
-
-        <p className="text-center text-ink-faint text-sm mt-6">
-          {people.length > 0
-            ? `${people.length} ${people.length === 1 ? "neighbor" : "neighbors"} in your notebook`
-            : "Go take a walk."}
-        </p>
       </div>
 
       {/* Neighbor browser — slides up when active */}
