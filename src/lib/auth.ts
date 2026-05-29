@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
+import { SESSION_COOKIE } from "./auth-constants";
 
-export const SESSION_COOKIE = "app_session";
+export { SESSION_COOKIE };
 
 /** Is APP_PASSWORD set in the environment? */
 export function isPasswordSet(): boolean {

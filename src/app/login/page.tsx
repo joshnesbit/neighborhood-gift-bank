@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { BookOpen, ArrowRight, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,8 +21,9 @@ export default function LoginPage() {
         body: JSON.stringify({ password }),
       });
       if (res.ok) {
-        router.push("/");
-        router.refresh();
+        // Full reload so the auth provider re-checks the new session cookie.
+        window.location.assign("/");
+        return;
       } else {
         const data = await res.json().catch(() => ({}));
         setError(data.error || "Sign in failed");

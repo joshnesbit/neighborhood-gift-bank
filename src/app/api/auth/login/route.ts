@@ -11,6 +11,8 @@ export async function POST(request: NextRequest) {
 
   const { password } = (await request.json()) as { password?: string };
   if (!password || !passwordMatches(password)) {
+    // Speed bump: makes brute-forcing a short passcode impractical.
+    await new Promise((r) => setTimeout(r, 800));
     return Response.json({ error: "Wrong password" }, { status: 401 });
   }
 
