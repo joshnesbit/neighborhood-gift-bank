@@ -1,9 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { createServerClient } from "@/lib/supabase-server";
+import { query, isDbConfigured, uuid, nowIso, todayIsoPacific } from "@/lib/db";
+import { isAuthenticated } from "@/lib/auth";
 
 const anthropic = new Anthropic();
 
-const SYSTEM_PROMPT = `You are helping a roving listener track their conversations with neighbors. The listener is in the tradition of De'Amon Harges: listening for gifts, passions, and dreams (not needs).
+function buildSystemPrompt(todayPacific: string) {
+  return `You are helping a roving listener track their conversations with neighbors. The listener is in the tradition of De'Amon Harges: listening for gifts, passions, and dreams (not needs).
 
 When you parse a note, categorize gifts as:
 - head: knowledge a person carries (history, languages, who lives where)
@@ -16,7 +18,33 @@ A single statement can produce multiple gifts. "Marcus used to teach woodworking
 
 Match people against the provided list when you can; only mark a person as new if no plausible match exists. Be conservative about creating new people from passing mentions.
 
-Do not infer needs or problems. Only extract what was actually heard.`;
+Do not infer needs or problems. Only extract what was actually heard.
+
+FOLLOW-UPS
+
+Today's date is ${todayPacific} (Pacific time, the listener's calendar).
+
+Extract a follow-up only when the note contains an explicit commitment or event:
+- The listener said they would do something ("I'll text Lila", "I should introduce them", "remember to ask")
+- A future event or deadline was mentioned ("her recital is Friday", "he's back from his trip on the 10th")
+
+Do NOT invent follow-ups from passing comments, general curiosity, or unstated implications.
+
+For each follow-up, fill three fields:
+- text: the action or thing to remember, written in the listener's voice (e.g., "Introduce Marcus to Lila", "Ask Lila about her recital")
+- due_date: ISO date YYYY-MM-DD if a clear timing is given (resolve relative phrases against today). Use null if no date is mentioned.
+- person_name: the single neighbor most relevant to the follow-up, or null if it doesn't center on one person. Use the name as it appears in the note.
+
+Date resolution examples (today = ${todayPacific}):
+- "tomorrow" → today + 1 day
+- "next week" → today + 7 days
+- "this Friday" → the upcoming Friday from today
+- "in two weeks" → today + 14 days
+- "on the 24th" → the next occurrence of the 24th
+- "next month" → today + 30 days (approximate)
+
+Only emit a due_date if the timing is reasonably specific. "Someday" or "eventually" should leave due_date null.`;
+}
 
 const TOOL_SCHEMA = {
   name: "record_note_extraction",
@@ -60,8 +88,24 @@ const TOOL_SCHEMA = {
       },
       follow_ups: {
         type: "array",
-        items: { type: "string" },
-        description: "Things the listener said they would do (e.g. 'introduce Marcus to Lila')",
+        items: {
+          type: "object",
+          properties: {
+            text: {
+              type: "string",
+              description: "The action or thing to remember, in the listener's voice",
+            },
+            due_date: {
+              type: ["string", "null"],
+              description: "ISO date YYYY-MM-DD if a clear timing is given, otherwise null",
+            },
+            person_name: {
+              type: ["string", "null"],
+              description: "The neighbor most relevant to this follow-up, or null",
+            },
+          },
+          required: ["text", "due_date", "person_name"],
+        },
       },
     },
     required: ["people"],
@@ -69,42 +113,48 @@ const TOOL_SCHEMA = {
 };
 
 export async function POST(request: Request) {
-  const { raw_text } = await request.json();
+  if (!(await isAuthenticated())) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  const { raw_text } = await request.json();
   if (!raw_text?.trim()) {
     return Response.json({ error: "No text provided" }, { status: 400 });
   }
 
-  const supabase = createServerClient();
-  if (!supabase) return Response.json({ error: "Not configured" }, { status: 503 });
-
-  // Save the raw note first
-  const { data: note, error: noteError } = await supabase
-    .from("notes")
-    .insert({ raw_text, recorded_at: new Date().toISOString() })
-    .select()
-    .single();
-
-  if (noteError || !note) {
-    return Response.json({ error: "Failed to save note" }, { status: 500 });
+  if (!isDbConfigured()) {
+    return Response.json({ error: "Not configured" }, { status: 503 });
   }
 
-  // Get existing people for matching
-  const { data: existingPeople } = await supabase
-    .from("people")
-    .select("id, name, aliases");
+  // Save the raw note first
+  const noteId = uuid();
+  const recordedAt = nowIso();
+  await query(
+    "insert into notes (id, raw_text, recorded_at) values ($1, $2, $3)",
+    [noteId, raw_text, recordedAt]
+  );
 
-  const peopleContext = (existingPeople || []).map((p) => ({
-    id: p.id,
-    name: p.name,
-    aliases: p.aliases,
+  // Existing people for matching
+  const existing = await query("select id, name, aliases from people");
+  const peopleContext = existing.map((r) => ({
+    id: String(r.id),
+    name: String(r.name),
+    aliases: (() => {
+      try {
+        return JSON.parse(String(r.aliases || "[]"));
+      } catch {
+        return [];
+      }
+    })(),
   }));
+
+  const todayPacific = todayIsoPacific();
 
   try {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(todayPacific),
       tools: [TOOL_SCHEMA],
       tool_choice: { type: "tool", name: "record_note_extraction" },
       messages: [
@@ -115,21 +165,19 @@ export async function POST(request: Request) {
       ],
     });
 
-    // Extract the tool use result
-    const toolUse = message.content.find((block) => block.type === "tool_use");
+    const toolUse = message.content.find((b) => b.type === "tool_use");
     const structured = toolUse ? toolUse.input : { people: [], follow_ups: [] };
 
-    // Update the note with structured data
-    await supabase
-      .from("notes")
-      .update({ structured })
-      .eq("id", note.id);
+    await query("update notes set structured = $1 where id = $2", [
+      JSON.stringify(structured),
+      noteId,
+    ]);
 
-    return Response.json({ note_id: note.id, structured });
+    return Response.json({ note_id: noteId, structured });
   } catch (err) {
     console.error("Claude API error:", err);
     return Response.json(
-      { note_id: note.id, structured: null, error: "Failed to parse note" },
+      { note_id: noteId, structured: null, error: "Failed to parse note" },
       { status: 200 }
     );
   }

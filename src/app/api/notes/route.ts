@@ -1,113 +1,109 @@
 import { NextRequest } from "next/server";
-import { createServerClient } from "@/lib/supabase-server";
+import { query, isDbConfigured, uuid, nowIso } from "@/lib/db";
+import { isAuthenticatedReq, unauthorized } from "@/lib/auth";
 import type { NoteStructured } from "@/lib/database.types";
 
 export async function POST(request: NextRequest) {
+  if (!isAuthenticatedReq(request)) return unauthorized();
+
   const { note_id, structured } = (await request.json()) as {
     note_id: string;
     structured: NoteStructured;
   };
-
   if (!note_id || !structured) {
     return Response.json({ error: "Missing note_id or structured data" }, { status: 400 });
   }
 
-  const supabase = createServerClient();
-  if (!supabase) return Response.json({ error: "Not configured" }, { status: 503 });
-  const now = new Date().toISOString();
+  if (!isDbConfigured()) {
+    return Response.json({ error: "Not configured" }, { status: 503 });
+  }
+
+  const now = nowIso();
+  const today = now.split("T")[0];
+
+  // Track which person each parsed name resolved to, so we can link reminders.
+  const nameToId: Record<string, string> = {};
 
   for (const person of structured.people) {
     let personId = person.matched_id;
 
     if (!personId) {
-      // Create new person
-      const { data: newPerson, error } = await supabase
-        .from("people")
-        .insert({
-          name: person.name,
-          where_they_are: person.where_they_are || null,
-          first_met_at: new Date().toISOString().split("T")[0],
-          last_seen_at: now,
-          notes_count: 1,
-        })
-        .select()
-        .single();
-
-      if (error || !newPerson) {
-        console.error("Failed to create person:", error);
-        continue;
-      }
-      personId = newPerson.id;
+      personId = uuid();
+      await query(
+        `insert into people (id, name, where_they_are, first_met_at, last_seen_at, notes_count, created_at, updated_at)
+         values ($1, $2, $3, $4, $5, 1, $6, $7)`,
+        [personId, person.name, person.where_they_are || null, today, now, now, now]
+      );
     } else {
-      // Update existing person
-      const { data: existing } = await supabase
-        .from("people")
-        .select("notes_count, where_they_are")
-        .eq("id", personId)
-        .single();
+      const existing = await query(
+        "select notes_count, where_they_are from people where id = $1",
+        [personId]
+      );
+      const row = existing[0];
+      const currentCount = row ? Number(row.notes_count || 0) : 0;
+      const currentWhere = row && row.where_they_are ? String(row.where_they_are) : null;
+      const newWhere =
+        person.where_they_are && !currentWhere ? person.where_they_are : currentWhere;
 
-      const updates: Record<string, unknown> = {
-        last_seen_at: now,
-        notes_count: (existing?.notes_count || 0) + 1,
-      };
-
-      if (person.where_they_are && !existing?.where_they_are) {
-        updates.where_they_are = person.where_they_are;
-      }
-
-      await supabase.from("people").update(updates).eq("id", personId);
-    }
-
-    // Link person to note
-    await supabase.from("note_people").insert({
-      note_id,
-      person_id: personId,
-    });
-
-    // Create gifts
-    if (person.gifts.length > 0) {
-      await supabase.from("gifts").insert(
-        person.gifts.map((g) => ({
-          person_id: personId!,
-          text: g.text,
-          kind: g.kind,
-          source_note_id: note_id,
-        }))
+      await query(
+        `update people set last_seen_at = $1, notes_count = $2, where_they_are = $3, updated_at = $4 where id = $5`,
+        [now, currentCount + 1, newWhere, now, personId]
       );
     }
 
-    // Create connections from pointed_to
+    if (personId) nameToId[person.name.toLowerCase()] = personId;
+
+    // Link person to note
+    await query(
+      "insert into note_people (note_id, person_id) values ($1, $2) on conflict do nothing",
+      [note_id, personId]
+    );
+
+    // Gifts
+    for (const g of person.gifts) {
+      await query(
+        `insert into gifts (id, person_id, text, kind, source_note_id) values ($1, $2, $3, $4, $5)`,
+        [uuid(), personId, g.text, g.kind, note_id]
+      );
+    }
+
+    // Connections from pointed_to
     if (person.pointed_to && person.pointed_to.length > 0) {
       for (const targetName of person.pointed_to) {
-        // Try to find the target person
-        const { data: targets } = await supabase
-          .from("people")
-          .select("id")
-          .ilike("name", `%${targetName}%`)
-          .limit(1);
-
-        let targetId = targets?.[0]?.id;
+        const m = await query(
+          "select id from people where name ilike $1 limit 1",
+          [`%${targetName}%`]
+        );
+        let targetId = m[0] ? String(m[0].id) : null;
 
         if (!targetId) {
-          // Create the target person as a stub
-          const { data: newTarget } = await supabase
-            .from("people")
-            .insert({ name: targetName })
-            .select()
-            .single();
-          targetId = newTarget?.id;
+          targetId = uuid();
+          await query(
+            `insert into people (id, name, created_at, updated_at) values ($1, $2, $3, $4)`,
+            [targetId, targetName, now, now]
+          );
         }
 
         if (targetId && personId) {
-          await supabase.from("connections").insert({
-            from_person: personId,
-            to_person: targetId,
-            reason: `${person.name} pointed toward ${targetName}`,
-            source_note_id: note_id,
-            status: "suggested",
-          });
+          await query(
+            `insert into connections (id, from_person, to_person, reason, source_note_id, status)
+             values ($1, $2, $3, $4, $5, 'suggested')`,
+            [uuid(), personId, targetId, `${person.name} pointed toward ${targetName}`, note_id]
+          );
         }
       }
+    }
+  }
+
+  // Reminders for any follow-ups with an explicit due_date
+  if (structured.follow_ups && structured.follow_ups.length > 0) {
+    for (const f of structured.follow_ups) {
+      if (!f.due_date) continue;
+      const personId = f.person_name ? nameToId[f.person_name.toLowerCase()] || null : null;
+      await query(
+        `insert into reminders (id, note_id, person_id, text, due_date) values ($1, $2, $3, $4, $5)`,
+        [uuid(), note_id, personId, f.text, f.due_date]
+      );
     }
   }
 
@@ -115,14 +111,15 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  if (!isAuthenticatedReq(request)) return unauthorized();
+
   const noteId = request.nextUrl.searchParams.get("id");
-  if (!noteId) {
-    return Response.json({ error: "Missing id" }, { status: 400 });
+  if (!noteId) return Response.json({ error: "Missing id" }, { status: 400 });
+
+  if (!isDbConfigured()) {
+    return Response.json({ error: "Not configured" }, { status: 503 });
   }
 
-  const supabase = createServerClient();
-  if (!supabase) return Response.json({ error: "Not configured" }, { status: 503 });
-  await supabase.from("notes").delete().eq("id", noteId);
-
+  await query("delete from notes where id = $1", [noteId]);
   return Response.json({ ok: true });
 }

@@ -1,11 +1,9 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
-import { createBrowserClient } from "@/lib/supabase-browser";
 
 interface AuthContextType {
-  user: User | null;
+  user: { ok: true } | null;
   loading: boolean;
   configured: boolean;
   signOut: () => Promise<void>;
@@ -23,41 +21,30 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<{ ok: true } | null>(null);
   const [loading, setLoading] = useState(true);
   const [configured, setConfigured] = useState(false);
 
   useEffect(() => {
-    const supabase = createBrowserClient();
-
-    if (!supabase) {
-      setConfigured(false);
-      setLoading(false);
-      return;
-    }
-
-    setConfigured(true);
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
+    let canceled = false;
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (canceled) return;
+        setConfigured(!!data.configured);
+        setUser(data.authenticated ? { ok: true } : null);
         setLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
+      })
+      .catch(() => {
+        if (!canceled) setLoading(false);
+      });
+    return () => {
+      canceled = true;
+    };
   }, []);
 
   const signOut = async () => {
-    const supabase = createBrowserClient();
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
+    await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
   };
 

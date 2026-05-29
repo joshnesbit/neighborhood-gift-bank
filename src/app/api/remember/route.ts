@@ -1,61 +1,57 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { createServerClient } from "@/lib/supabase-server";
+import { query, isDbConfigured, rowToPerson } from "@/lib/db";
+import { isAuthenticated } from "@/lib/auth";
 import { GIFT_LABELS } from "@/lib/helpers";
 
 const anthropic = new Anthropic();
 
 export async function POST(request: Request) {
-  const { person_id } = await request.json();
+  if (!(await isAuthenticated())) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  const { person_id } = await request.json();
   if (!person_id) {
     return Response.json({ error: "Missing person_id" }, { status: 400 });
   }
 
-  const supabase = createServerClient();
-  if (!supabase) return Response.json({ error: "Not configured" }, { status: 503 });
+  if (!isDbConfigured()) {
+    return Response.json({ error: "Not configured" }, { status: 503 });
+  }
 
-  // Get person details
-  const { data: person } = await supabase
-    .from("people")
-    .select("*")
-    .eq("id", person_id)
-    .single();
-
-  if (!person) {
+  const personRows = await query("select * from people where id = $1 limit 1", [
+    person_id,
+  ]);
+  if (!personRows[0]) {
     return Response.json({ error: "Person not found" }, { status: 404 });
   }
+  const person = rowToPerson(personRows[0]);
 
-  // Get gifts
-  const { data: gifts } = await supabase
-    .from("gifts")
-    .select("*")
-    .eq("person_id", person_id);
+  const giftRows = await query(
+    "select kind, text from gifts where person_id = $1",
+    [person_id]
+  );
 
-  // Get recent notes
-  const { data: notePeople } = await supabase
-    .from("note_people")
-    .select("note_id")
-    .eq("person_id", person_id);
+  const recentNoteRows = await query(
+    `select n.raw_text, n.recorded_at
+     from notes n join note_people np on np.note_id = n.id
+     where np.person_id = $1
+     order by n.recorded_at desc
+     limit 3`,
+    [person_id]
+  );
+  const recentNotes = recentNoteRows.map((r) => ({
+    raw_text: String(r.raw_text),
+    recorded_at: String(r.recorded_at),
+  }));
 
-  const noteIds = notePeople?.map((np) => np.note_id) || [];
-  let recentNotes: Array<{ raw_text: string; recorded_at: string }> = [];
-
-  if (noteIds.length > 0) {
-    const { data: noteData } = await supabase
-      .from("notes")
-      .select("raw_text, recorded_at")
-      .in("id", noteIds)
-      .order("recorded_at", { ascending: false })
-      .limit(3);
-    recentNotes = noteData || [];
-  }
-
-  // Build the compact summary
   const giftsByKind: Record<string, string[]> = {};
-  (gifts || []).forEach((g) => {
-    if (!giftsByKind[g.kind]) giftsByKind[g.kind] = [];
-    giftsByKind[g.kind].push(g.text);
-  });
+  for (const r of giftRows) {
+    const kind = String(r.kind);
+    const text = String(r.text);
+    if (!giftsByKind[kind]) giftsByKind[kind] = [];
+    giftsByKind[kind].push(text);
+  }
 
   const giftSummary = Object.entries(giftsByKind)
     .map(([kind, texts]) => `${GIFT_LABELS[kind] || kind}: ${texts.join(", ")}`)
@@ -79,12 +75,10 @@ I am about to have a conversation with them. Give me 2-3 short things to keep in
       max_tokens: 300,
       messages: [{ role: "user", content: prompt }],
     });
-
     const text = message.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
       .join("");
-
     return Response.json({ reminders: text });
   } catch (err) {
     console.error("Claude API error:", err);

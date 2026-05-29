@@ -25,6 +25,7 @@
 
 html {
   background: var(--color-paper);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -32,6 +33,11 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Keep content clear of notches / home indicator in standalone PWA mode */
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
 }
 
 ::selection {
@@ -39,11 +45,21 @@ body {
   color: var(--color-ink);
 }
 
-input, textarea {
+input, textarea, select {
   font-family: inherit;
   color: inherit;
+  /* 16px minimum prevents iOS Safari from zooming in on focus */
+  font-size: 16px;
 }
 
 textarea:focus, input:focus {
   outline: none;
+}
+
+/* Safe-area helpers for full-screen (fixed) overlays that escape body padding */
+.pt-safe {
+  padding-top: max(1.5rem, env(safe-area-inset-top));
+}
+.pb-safe {
+  padding-bottom: max(2rem, env(safe-area-inset-bottom));
 }

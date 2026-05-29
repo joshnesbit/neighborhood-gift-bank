@@ -1,16 +1,17 @@
-import { createServerClient } from "@/lib/supabase-server";
+import { NextRequest } from "next/server";
+import { query, isDbConfigured, uuid, nowIso } from "@/lib/db";
+import { isAuthenticatedReq, unauthorized } from "@/lib/auth";
 import { demo } from "@/lib/demo-data";
 
-export async function POST(request: Request) {
-  const { name, where_they_are, freeform } = await request.json();
+export async function POST(request: NextRequest) {
+  if (!isAuthenticatedReq(request)) return unauthorized();
 
+  const { name, where_they_are, freeform } = await request.json();
   if (!name?.trim()) {
     return Response.json({ error: "Name is required" }, { status: 400 });
   }
 
-  const supabase = createServerClient();
-
-  if (!supabase) {
+  if (!isDbConfigured()) {
     // Demo mode: add to in-memory store
     const newPerson = {
       id: `demo-new-${Date.now()}`,
@@ -24,7 +25,6 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     };
     demo.people.push(newPerson);
-
     if (freeform) {
       const newNote = {
         id: `demo-note-${Date.now()}`,
@@ -36,43 +36,39 @@ export async function POST(request: Request) {
       demo.notes.push(newNote);
       demo.notePeople.push({ note_id: newNote.id, person_id: newPerson.id });
     }
-
     return Response.json({ id: newPerson.id });
   }
 
-  const now = new Date().toISOString();
+  const now = nowIso();
+  const today = now.split("T")[0];
+  const personId = uuid();
 
-  const { data: person, error } = await supabase
-    .from("people")
-    .insert({
-      name: name.trim(),
-      where_they_are: where_they_are || null,
-      first_met_at: now.split("T")[0],
-      last_seen_at: now,
-      notes_count: freeform ? 1 : 0,
-    })
-    .select()
-    .single();
+  await query(
+    `insert into people (id, name, where_they_are, first_met_at, last_seen_at, notes_count, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      personId,
+      name.trim(),
+      where_they_are || null,
+      today,
+      now,
+      freeform?.trim() ? 1 : 0,
+      now,
+      now,
+    ]
+  );
 
-  if (error || !person) {
-    return Response.json({ error: "Failed to create person" }, { status: 500 });
-  }
-
-  // If there's freeform text, save it as a note
   if (freeform?.trim()) {
-    const { data: note } = await supabase
-      .from("notes")
-      .insert({ raw_text: freeform, recorded_at: now })
-      .select()
-      .single();
-
-    if (note) {
-      await supabase.from("note_people").insert({
-        note_id: note.id,
-        person_id: person.id,
-      });
-    }
+    const noteId = uuid();
+    await query(
+      `insert into notes (id, raw_text, recorded_at) values ($1, $2, $3)`,
+      [noteId, freeform, now]
+    );
+    await query(
+      `insert into note_people (note_id, person_id) values ($1, $2)`,
+      [noteId, personId]
+    );
   }
 
-  return Response.json({ id: person.id });
+  return Response.json({ id: personId });
 }

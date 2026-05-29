@@ -14,10 +14,11 @@ The name picks up De'Amon Harges' framing of this work as social banking: gifts 
 - **Browse** all neighbors, sorted by recently seen, longest past, or alphabetical
 - **Search** across everyone by name, gift text, or raw note content
 - **Remember** — a one-tap "what should I remember?" button that returns 2-3 listening-oriented reminders before your next conversation
+- **Follow-up emails** — any note with a dated commitment ("follow up next Friday", "her recital is on the 24th") fires a digest email the morning of, via Resend
 
 ## Demo mode
 
-The app works out of the box with no backend configured. It ships with an in-memory demo dataset of 7 neighbors, 30+ gifts, and 10 notes so you can explore the full experience immediately.
+The app works out of the box with no backend configured. It ships with an in-memory demo dataset of 7 neighbors, 30+ gifts, and 10 notes so you can explore the full experience immediately. Auth is also bypassed in demo mode.
 
 ## The practice
 
@@ -38,11 +39,14 @@ Gifts are categorized using John McKnight and Peter Block's framework:
 ## Stack
 
 - [Next.js](https://nextjs.org/) (App Router)
-- [Supabase](https://supabase.com/) (Postgres + magic link auth)
+- [Neon](https://neon.tech) (Postgres) via `@neondatabase/serverless` — schema in `db/schema.sql`
+- Single-user password gate via `APP_PASSWORD` cookie
 - [Anthropic Claude API](https://docs.anthropic.com/) (server-side note parsing and reminders)
+- [Resend](https://resend.com) (daily follow-up email digest)
+- [Vercel Cron](https://vercel.com/docs/cron-jobs) (daily reminder trigger)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Lucide React](https://lucide.dev/) icons
-- PWA-installable via manifest
+- PWA-installable via manifest; voice capture uses your phone keyboard's dictation mic
 
 ## Setup
 
@@ -62,20 +66,45 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). No environment variables needed for the demo.
 
-### 3. Connect a backend (optional)
+### 3. Connect a backend
 
-Create a [Supabase](https://supabase.com) project, run `supabase/migrations/001_initial_schema.sql` in the SQL Editor, then:
+Provision Neon. The easiest path is through Vercel: **Storage → Create Database → Neon**, which injects `DATABASE_URL` into your project automatically. Or create a project at [neon.tech](https://neon.tech) and copy the pooled connection string.
+
+Apply the schema by pasting `db/schema.sql` into the Neon SQL Editor, or:
+
+```bash
+psql "$DATABASE_URL" -f db/schema.sql
+```
+
+Copy the env template and fill it in:
 
 ```bash
 cp .env.example .env.local
 ```
 
-Fill in:
+Set:
 
-- `NEXT_PUBLIC_SUPABASE_URL` — your Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — your Supabase anon/public key
-- `SUPABASE_SERVICE_ROLE_KEY` — your Supabase service role key
+- `DATABASE_URL` — Neon pooled connection string
 - `ANTHROPIC_API_KEY` — your Anthropic API key
+- `RESEND_API_KEY` — your Resend API key
+- `REMINDER_EMAIL_FROM`, `REMINDER_EMAIL_TO` — sender (must be a verified Resend domain) and recipient
+- `CRON_SECRET` — generate with `openssl rand -hex 32`
+- `APP_PASSWORD` — single password for the app (leave blank locally to bypass)
+- `NEXT_PUBLIC_APP_URL` — your deployed URL (for links inside reminder emails)
+
+Seed demo data into the new database (optional):
+
+```bash
+npm run seed
+```
+
+### 4. Deploy
+
+Push to GitHub and import the repo in Vercel. Add the env vars above in the project settings. The Vercel Cron in `vercel.json` runs `/api/cron/send-reminders` daily at 15:00 UTC (8 AM PDT / 7 AM PST).
+
+### 5. Install on your phone
+
+Open the deployed URL in Safari (iOS) or Chrome (Android) and choose **Add to Home Screen**. It installs as a standalone app with its own icon. Capture voice notes by tapping the microphone on your phone's keyboard.
 
 ## Design
 

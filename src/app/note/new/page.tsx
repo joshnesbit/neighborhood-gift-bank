@@ -2,9 +2,19 @@
 
 import { useState, useRef, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Mic, Save, Loader2, Check, Pencil, X, Link2, MessageSquarePlus } from "lucide-react";
+import { ArrowLeft, Mic, Save, Loader2, Check, Pencil, X, Link2, MessageSquarePlus, Bell } from "lucide-react";
 import { GiftChip } from "@/components/gift-chip";
-import type { NoteStructured, GiftKind } from "@/lib/database.types";
+import type { NoteStructured } from "@/lib/database.types";
+
+function formatReminderDate(iso: string): string {
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 type Stage = "capture" | "thinking" | "confirm";
 
@@ -156,12 +166,25 @@ function NewNoteContent() {
 
           {parsed.follow_ups && parsed.follow_ups.length > 0 && (
             <div className="bg-cream rounded-2xl p-5 shadow-[0_2px_8px_var(--color-warm-shadow)]">
-              <p className="font-hand text-base text-ink-faint mb-2">follow-ups</p>
-              <ul className="space-y-1">
+              <p className="font-hand text-base text-ink-faint mb-3">follow-ups</p>
+              <ul className="space-y-2">
                 {parsed.follow_ups.map((f, i) => (
-                  <li key={i} className="text-sm text-ink">• {f}</li>
+                  <li key={i} className="text-sm text-ink leading-relaxed">
+                    <span className="text-ink-faint">•</span> {f.text}
+                    {f.due_date && (
+                      <span className="ml-2 inline-flex items-center gap-1 text-xs text-sage">
+                        <Bell className="w-3 h-3" strokeWidth={2.5} />
+                        {formatReminderDate(f.due_date)}
+                      </span>
+                    )}
+                  </li>
                 ))}
               </ul>
+              {parsed.follow_ups.some((f) => f.due_date) && (
+                <p className="text-xs text-ink-faint italic mt-3">
+                  Reminders will arrive in your inbox the morning of.
+                </p>
+              )}
             </div>
           )}
         </div>

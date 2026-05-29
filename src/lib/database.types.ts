@@ -45,6 +45,12 @@ export interface NotePerson {
   person_id: string;
 }
 
+export interface FollowUp {
+  text: string;
+  due_date: string | null; // ISO date YYYY-MM-DD, in Pacific time
+  person_name: string | null;
+}
+
 export interface NoteStructured {
   people: {
     matched_id: string | null;
@@ -53,7 +59,17 @@ export interface NoteStructured {
     gifts: { text: string; kind: GiftKind }[];
     pointed_to?: string[];
   }[];
-  follow_ups?: string[];
+  follow_ups?: FollowUp[];
+}
+
+export interface Reminder {
+  id: string;
+  note_id: string | null;
+  person_id: string | null;
+  text: string;
+  due_date: string; // YYYY-MM-DD
+  sent_at: string | null;
+  created_at: string;
 }
 
 export interface PersonWithGifts extends Person {
@@ -76,6 +92,7 @@ export interface Database {
       gifts: { Row: Gift; Insert: Partial<Gift> & { person_id: string; text: string; kind: GiftKind }; Update: Partial<Gift> };
       note_people: { Row: NotePerson; Insert: NotePerson; Update: Partial<NotePerson> };
       connections: { Row: Connection; Insert: Partial<Connection> & { from_person: string; to_person: string }; Update: Partial<Connection> };
+      reminders: { Row: Reminder; Insert: Partial<Reminder> & { text: string; due_date: string }; Update: Partial<Reminder> };
     };
   };
 }

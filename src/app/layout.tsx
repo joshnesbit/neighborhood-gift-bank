@@ -25,6 +25,13 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Gift Bank",
   },
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -33,6 +40,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: "#F8F1E4",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -45,7 +53,7 @@ export default function RootLayout({
       lang="en"
       className={`${dmSans.variable} ${fraunces.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-[100dvh] flex flex-col">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

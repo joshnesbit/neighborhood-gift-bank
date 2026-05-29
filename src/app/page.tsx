@@ -68,7 +68,7 @@ export default function Home() {
   // Auth gate
   if (!authLoading && !user && configured) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-full px-8">
+      <div className="flex flex-col items-center justify-center flex-1 px-8">
         <div className="w-full max-w-sm text-center">
           <BookOpen className="w-10 h-10 text-terracotta mx-auto mb-4" strokeWidth={2} />
           <h1 className="font-serif text-2xl font-semibold text-ink mb-1">
@@ -95,7 +95,7 @@ export default function Home() {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-full">
+      <div className="flex items-center justify-center flex-1">
         <p className="text-ink-faint text-lg animate-pulse">
           opening the notebook...
         </p>
@@ -104,7 +104,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col h-dvh">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
       <header className="px-5 pt-6 pb-1">
         <div className="flex items-center justify-between">
@@ -155,7 +155,7 @@ export default function Home() {
       {/* Neighbor browser — slides up when active */}
       {showList && (
         <div className="fixed inset-0 bg-paper flex flex-col z-10">
-          <header className="flex items-center gap-3 px-5 pt-6 pb-2">
+          <header className="flex items-center gap-3 px-5 pt-safe pb-2">
             <button
               onClick={handleCloseBrowse}
               className="p-2 -m-2 text-ink-faint hover:text-ink"
@@ -217,7 +217,7 @@ export default function Home() {
           </div>
 
           {/* List */}
-          <div className="flex-1 px-5 pt-2 pb-8 overflow-y-auto">
+          <div className="flex-1 px-5 pt-2 pb-safe overflow-y-auto">
             {loading ? (
               <div className="text-center py-8">
                 <p className="text-ink-faint text-base animate-pulse">
