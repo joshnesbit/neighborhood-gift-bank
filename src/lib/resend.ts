@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-const FROM = process.env.REMINDER_EMAIL_FROM || "Outer Sunset <josh@relationaltechproject.org>";
+const FROM = process.env.REMINDER_EMAIL_FROM || "Neighborhood Gift Bank <notifications@relationaltechproject.org>";
 const TO = process.env.REMINDER_EMAIL_TO || "joshuanesbit@gmail.com";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
