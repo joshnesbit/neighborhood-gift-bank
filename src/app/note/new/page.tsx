@@ -36,6 +36,7 @@ function NewNoteContent() {
   const [parsed, setParsed] = useState<NoteStructured | null>(null);
   const [noteId, setNoteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const typeConfig = useMemo(() => {
     switch (noteType) {
@@ -71,6 +72,7 @@ function NewNoteContent() {
 
   const handleSaveNote = async () => {
     if (!text.trim()) return;
+    setError(null);
     setStage("thinking");
 
     try {
@@ -80,13 +82,28 @@ function NewNoteContent() {
         body: JSON.stringify({ raw_text: text }),
       });
 
-      if (!res.ok) throw new Error("Failed to parse");
+      if (!res.ok) {
+        let msg = "Something went wrong saving your note. Please try again.";
+        if (res.status === 401) msg = "Your session expired — please sign in again.";
+        else if (res.status === 503) msg = "The notebook's database isn't connected yet.";
+        else if (res.status >= 500)
+          msg = "Couldn't reach the database — it may not be set up yet. Try again in a moment.";
+        setError(msg);
+        setStage("capture");
+        return;
+      }
 
       const data = await res.json();
+      if (!data.structured) {
+        setError("I saved the note but couldn't read it just now. Please try again.");
+        setStage("capture");
+        return;
+      }
       setNoteId(data.note_id);
       setParsed(data.structured);
       setStage("confirm");
     } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
       setStage("capture");
     }
   };
@@ -94,15 +111,18 @@ function NewNoteContent() {
   const handleConfirm = async () => {
     if (!noteId || !parsed) return;
     setSaving(true);
+    setError(null);
 
     try {
-      await fetch("/api/notes", {
+      const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ note_id: noteId, structured: parsed }),
       });
+      if (!res.ok) throw new Error("save failed");
       router.push("/");
     } catch {
+      setError("Couldn't save your note. Please try again.");
       setSaving(false);
     }
   };
@@ -246,13 +266,19 @@ function NewNoteContent() {
         <textarea
           ref={textareaRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (error) setError(null);
+          }}
           placeholder={typeConfig.placeholder}
           className="flex-1 w-full bg-cream rounded-2xl p-5 text-ink text-base leading-relaxed resize-none placeholder:text-ink-faint/50 shadow-inner min-h-[200px] border border-ink/5"
         />
       </div>
 
       <div className="px-5 pb-8 pt-2">
+        {error && (
+          <p className="text-sm text-terracotta text-center mb-3">{error}</p>
+        )}
         <button
           onClick={handleSaveNote}
           disabled={!text.trim()}
